@@ -19,7 +19,7 @@ const CONFIG = {
   OBSTACLE_MAX_COUNT: 10,  // Maximum number of obstacle blobs
   OBSTACLE_MIN_SEP: 3,     // Minimum separation between obstacles (in nodes)
   OBSTACLE_MIN_SIZE: 2,    // Minimum size of obstacle blob (in pixels)
-  OBSTACLE_MAX_SIZE: 6,    // Maximum size of obstacle blob (in pixels)
+  OBSTACLE_MAX_SIZE: 4,    // Maximum size of obstacle blob (in pixels)
 
   // Light Timing (in milliseconds)
   GREEN_MIN_MS: 3000,      // Minimum green light duration
