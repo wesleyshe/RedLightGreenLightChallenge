@@ -108,14 +108,8 @@ class Player {
     return node === otherPlayer.startNode && hasMinDistance;
   }
 
-  getAngle() {
-    let node = this.getCurrentNode();
-    return (node / CONFIG.TRACK_LEN) * TWO_PI - HALF_PI;
-  }
-
-  draw(obstacles) {
+  draw() {
     if (!this.isAlive) return;
-    let node = this.getCurrentNode();
-    drawSquarePixel(node, this.color);
+    drawSquarePixel(this.getCurrentNode(), this.color);
   }
 }

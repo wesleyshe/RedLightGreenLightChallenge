@@ -10,9 +10,9 @@ const CONFIG = {
   PIXEL_SIZE: 14,          // Size of each square pixel on the track
 
   // Movement Physics
-  ACCEL: 180,              // Acceleration when pressing keys
+  ACCEL: 200,              // Acceleration when pressing keys
   INERTIA: 0.95,           // Momentum (0-1, higher = more slippery/momentum, lower = tighter control)
-  MAX_SPEED: 20,           // Maximum velocity
+  MAX_SPEED: 10,           // Maximum velocity
 
   // Obstacles
   OBSTACLE_MIN_COUNT: 6,   // Minimum number of obstacle blobs
@@ -25,7 +25,7 @@ const CONFIG = {
   GREEN_MIN_MS: 3000,      // Minimum green light duration
   GREEN_MAX_MS: 6000,      // Maximum green light duration
   YELLOW_MIN_MS: 2000,     // Minimum yellow light duration
-  YELLOW_MAX_MS: 4000,     // Maximum yellow light duration
+  YELLOW_MAX_MS: 5000,     // Maximum yellow light duration
   RED_MIN_MS: 3000,        // Minimum red light duration
   RED_MAX_MS: 5000,        // Maximum red light duration
 

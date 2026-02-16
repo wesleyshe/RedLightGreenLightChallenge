@@ -20,47 +20,25 @@ function generateObstacles() {
   let forbiddenNodes = [0, players[0].startNode, players[1].startNode];
   let targetCount = Math.floor(randomRange(CONFIG.OBSTACLE_MIN_COUNT, CONFIG.OBSTACLE_MAX_COUNT + 1));
   let maxAttempts = 1000;
-  let attempts = 0;
 
-  while (obstacles.length < targetCount && attempts < maxAttempts) {
-    attempts++;
-    
-    // Random blob size
+  for (let attempts = 0; attempts < maxAttempts && obstacles.length < targetCount; attempts++) {
     let blobSize = Math.floor(randomRange(CONFIG.OBSTACLE_MIN_SIZE, CONFIG.OBSTACLE_MAX_SIZE + 1));
-    
-    // Random starting position for the blob
     let startNode = Math.floor(Math.random() * CONFIG.TRACK_LEN);
     
-    // Create the blob as an array of consecutive nodes
     let blob = [];
     for (let i = 0; i < blobSize; i++) {
       blob.push(wrapIndex(startNode + i));
     }
     
-    // Check if any node in the blob is forbidden
-    let hasForbidden = false;
-    for (let node of blob) {
-      if (forbiddenNodes.includes(node)) {
-        hasForbidden = true;
-        break;
-      }
-    }
-    if (hasForbidden) continue;
+    if (blob.some(node => forbiddenNodes.includes(node))) continue;
     
-    // Check if blob is too close to existing obstacle blobs
-    let tooClose = false;
-    for (let existingBlob of obstacles) {
-      for (let node of blob) {
-        for (let existingNode of existingBlob) {
-          if (circularDistance(node, existingNode) < CONFIG.OBSTACLE_MIN_SEP) {
-            tooClose = true;
-            break;
-          }
-        }
-        if (tooClose) break;
-      }
-      if (tooClose) break;
-    }
+    let tooClose = obstacles.some(existingBlob =>
+      blob.some(node =>
+        existingBlob.some(existingNode =>
+          circularDistance(node, existingNode) < CONFIG.OBSTACLE_MIN_SEP
+        )
+      )
+    );
     
     if (!tooClose) {
       obstacles.push(blob);
@@ -98,21 +76,19 @@ function switchLightState() {
 }
 
 function checkRedLightLoss() {
-  // At the instant the light becomes RED, check if players are hidden
   let p1Hidden = players[0].isHidden(obstacles);
   let p2Hidden = players[1].isHidden(obstacles);
 
   if (!p1Hidden && !p2Hidden) {
-    // Both lose - draw
     players[0].isAlive = false;
     players[1].isAlive = false;
     endGame('draw', 'both players caught by red light');
   } else if (!p1Hidden) {
     players[0].isAlive = false;
-    endGame(players[1].name, players[0].name + ' caught by red light');
+    endGame(players[1].name, players[0].name.toLowerCase() + ' caught by red light');
   } else if (!p2Hidden) {
     players[1].isAlive = false;
-    endGame(players[0].name, players[1].name + ' caught by red light');
+    endGame(players[0].name, players[1].name.toLowerCase() + ' caught by red light');
   }
 }
 
@@ -128,40 +104,18 @@ function startGame() {
   winner = null;
   endReason = '';
 
-  // Randomize starting positions adjacent to traffic light (node 0)
-  // One player on node 1 (clockwise), one on node -1 (counterclockwise)
   let clockwiseNode = 1;
-  let counterclockwiseNode = wrapIndex(-1); // This will be TRACK_LEN - 1
+  let counterclockwiseNode = CONFIG.TRACK_LEN - 1;
   
-  // Randomly assign which player gets which side
-  let player1Node, player2Node;
-  if (Math.random() < 0.5) {
-    player1Node = clockwiseNode;
-    player2Node = counterclockwiseNode;
-  } else {
-    player1Node = counterclockwiseNode;
-    player2Node = clockwiseNode;
-  }
+  let randomize = Math.random() < 0.5;
+  let player1Node = randomize ? clockwiseNode : counterclockwiseNode;
+  let player2Node = randomize ? counterclockwiseNode : clockwiseNode;
 
-  // Create players
   players = [
-    new Player(
-      player1Node, 
-      color(CONFIG.COLORS.player1), 
-      'Player 1', 
-      CONFIG.PLAYER1_LEFT, 
-      CONFIG.PLAYER1_RIGHT
-    ),
-    new Player(
-      player2Node, 
-      color(CONFIG.COLORS.player2), 
-      'Player 2', 
-      CONFIG.PLAYER2_LEFT, 
-      CONFIG.PLAYER2_RIGHT
-    )
+    new Player(player1Node, color(CONFIG.COLORS.player1), 'player 1', CONFIG.PLAYER1_LEFT, CONFIG.PLAYER1_RIGHT),
+    new Player(player2Node, color(CONFIG.COLORS.player2), 'player 2', CONFIG.PLAYER2_LEFT, CONFIG.PLAYER2_RIGHT)
   ];
 
-  // Generate obstacles once per round
   generateObstacles();
 }
 
@@ -172,28 +126,23 @@ function endGame(winnerName, reason) {
 }
 
 function checkWinConditions() {
-  if (!players[0].isAlive && !players[1].isAlive) {
-    if (winner === null) {
-      endGame('DRAW', 'Both players eliminated');
-    }
+  let bothDead = !players[0].isAlive && !players[1].isAlive;
+  
+  if (bothDead && winner === null) {
+    endGame('draw', 'both players eliminated');
     return;
   }
 
-  if (!players[0].isAlive) {
-    if (winner === null) {
-      endGame(players[1].name, players[0].name + ' moved during red light');
-    }
+  if (!players[0].isAlive && winner === null) {
+    endGame(players[1].name, players[0].name.toLowerCase() + ' moved during red light');
     return;
   }
 
-  if (!players[1].isAlive) {
-    if (winner === null) {
-      endGame(players[0].name, players[1].name + ' moved during red light');
-    }
+  if (!players[1].isAlive && winner === null) {
+    endGame(players[0].name, players[1].name.toLowerCase() + ' moved during red light');
     return;
   }
 
-  // Check if players reached opponent's start
   let p1Win = players[0].checkWin(players[1]);
   let p2Win = players[1].checkWin(players[0]);
 
@@ -234,18 +183,14 @@ function draw() {
     if (gameState === 'PLAYING') {
       drawTrack();
       drawObstacles(obstacles);
-      for (let player of players) {
-        player.draw(obstacles);
-      }
+      players.forEach(p => p.draw());
       drawTrafficLight(lightState);
       drawHUD();
     }
   } else if (gameState === 'END') {
     drawTrack();
     drawObstacles(obstacles);
-    for (let player of players) {
-      player.draw(obstacles);
-    }
+    players.forEach(p => p.draw());
     drawTrafficLight(lightState);
     drawEndScreen(winner, endReason);
   }
