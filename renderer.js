@@ -10,10 +10,13 @@ function drawTrack() {
 }
 
 function drawObstacles(obstacles) {
-  // Draw each obstacle blob
-  for (let obstacleBlob of obstacles) {
-    for (let node of obstacleBlob) {
-      drawSquarePixel(node, CONFIG.COLORS.obstacle);
+  for (let obs of obstacles) {
+    for (let nodeObj of obs.nodes) {
+      let scaleFactor = 1.0;
+      if (nodeObj.isBreathing) {
+        scaleFactor = 1.0 + 0.3 * Math.sin(nodeObj.breathingTimer * Math.PI * 4);
+      }
+      drawSquarePixel(nodeObj.index, CONFIG.COLORS.obstacle, scaleFactor);
     }
   }
 }
@@ -21,15 +24,17 @@ function drawObstacles(obstacles) {
 function drawTrafficLight(lightState) {
   // Draw at node 0 (top)
   let lightColor;
+  let scaleFactor = 1.0;
   if (lightState === 'GREEN') {
     lightColor = CONFIG.COLORS.lightGreen;
-  } else if (lightState === 'YELLOW') {
-    lightColor = CONFIG.COLORS.lightYellow;
+  } else if (lightState === 'BREATHING_GREEN') {
+    lightColor = CONFIG.COLORS.lightGreen;
+    scaleFactor = 1.0 + 0.2 * Math.sin(millis() / 150);
   } else if (lightState === 'RED') {
     lightColor = CONFIG.COLORS.lightRed;
   }
-  
-  drawSquarePixel(0, lightColor);
+
+  drawSquarePixel(0, lightColor, scaleFactor);
 }
 
 function drawHUD() {
@@ -57,7 +62,7 @@ function drawEndScreen(winner, endReason) {
   fill(CONFIG.COLORS.text);
   textSize(48);
   textAlign(CENTER, CENTER);
-  
+
   if (winner === 'DRAW') {
     fill(255, 255, 255);
     text('draw', width / 2, height / 2 - 60);

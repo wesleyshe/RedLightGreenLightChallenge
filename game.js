@@ -10,6 +10,14 @@ let obstacles = [];
 let players = [];
 let winner = null;
 let endReason = '';
+let currentTotalPixels = 0;
+let crossingSound;
+let waitingSound;
+
+function preload() {
+  crossingSound = loadSound('public/Crossing.mp3');
+  waitingSound = loadSound('public/Waiting.mp3');
+}
 
 // ===========================
 // OBSTACLE GENERATION
@@ -18,30 +26,39 @@ let endReason = '';
 function generateObstacles() {
   obstacles = [];
   let forbiddenNodes = [0, players[0].startNode, players[1].startNode];
-  let targetCount = Math.floor(randomRange(CONFIG.OBSTACLE_MIN_COUNT, CONFIG.OBSTACLE_MAX_COUNT + 1));
   let maxAttempts = 1000;
+  let currentPixels = 0;
+  let nextId = 1;
 
-  for (let attempts = 0; attempts < maxAttempts && obstacles.length < targetCount; attempts++) {
+  for (let attempts = 0; attempts < maxAttempts && currentPixels < currentTotalPixels; attempts++) {
+    let remainingPixels = currentTotalPixels - currentPixels;
     let blobSize = Math.floor(randomRange(CONFIG.OBSTACLE_MIN_SIZE, CONFIG.OBSTACLE_MAX_SIZE + 1));
+    blobSize = Math.min(blobSize, remainingPixels);
+    if (blobSize < 1) break;
+
     let startNode = Math.floor(Math.random() * CONFIG.TRACK_LEN);
-    
+
     let blob = [];
     for (let i = 0; i < blobSize; i++) {
       blob.push(wrapIndex(startNode + i));
     }
-    
+
     if (blob.some(node => forbiddenNodes.includes(node))) continue;
-    
-    let tooClose = obstacles.some(existingBlob =>
+
+    let tooClose = obstacles.some(existingObstacle =>
       blob.some(node =>
-        existingBlob.some(existingNode =>
-          circularDistance(node, existingNode) < CONFIG.OBSTACLE_MIN_SEP
+        existingObstacle.nodes.some(existingNode =>
+          circularDistance(node, existingNode.index) < CONFIG.OBSTACLE_MIN_SEP
         )
       )
     );
-    
+
     if (!tooClose) {
-      obstacles.push(blob);
+      obstacles.push({
+        id: nextId++,
+        nodes: blob.map(n => ({ index: n, isBreathing: false, breathingTimer: 0 }))
+      });
+      currentPixels += blobSize;
     }
   }
 }
@@ -60,18 +77,32 @@ function updateLightState(dt) {
 
 function switchLightState() {
   if (lightState === 'GREEN') {
-    lightState = 'YELLOW';
-    lightDuration = randomRange(CONFIG.YELLOW_MIN_MS, CONFIG.YELLOW_MAX_MS) / 1000;
+    lightState = 'BREATHING_GREEN';
+    let targetDuration = randomRange(CONFIG.BREATHING_GREEN_MIN_MS, CONFIG.BREATHING_GREEN_MAX_MS) / 1000;
+    lightDuration = Math.max(1, Math.round(targetDuration / CONFIG.AUDIO_WAITING_DURATION)) * CONFIG.AUDIO_WAITING_DURATION;
     lightTimer = 0;
-  } else if (lightState === 'YELLOW') {
+
+    crossingSound.stop();
+    if (!waitingSound.isPlaying()) waitingSound.play();
+  } else if (lightState === 'BREATHING_GREEN') {
     lightState = 'RED';
-    lightDuration = randomRange(CONFIG.RED_MIN_MS, CONFIG.RED_MAX_MS) / 1000;
+    let targetDuration = randomRange(CONFIG.RED_MIN_MS, CONFIG.RED_MAX_MS) / 1000;
+    lightDuration = Math.max(1, Math.round(targetDuration / CONFIG.AUDIO_WAITING_DURATION)) * CONFIG.AUDIO_WAITING_DURATION;
     lightTimer = 0;
     checkRedLightLoss();
+
+    crossingSound.stop();
+    if (!waitingSound.isPlaying()) waitingSound.play();
   } else if (lightState === 'RED') {
     lightState = 'GREEN';
-    lightDuration = randomRange(CONFIG.GREEN_MIN_MS, CONFIG.GREEN_MAX_MS) / 1000;
+    let targetDuration = randomRange(CONFIG.GREEN_MIN_MS, CONFIG.GREEN_MAX_MS) / 1000;
+    lightDuration = Math.max(1, Math.round(targetDuration / CONFIG.AUDIO_CROSSING_DURATION)) * CONFIG.AUDIO_CROSSING_DURATION;
     lightTimer = 0;
+    currentTotalPixels = Math.max(1, currentTotalPixels - CONFIG.OBSTACLE_PIXEL_DECREMENT);
+    generateObstacles();
+
+    waitingSound.stop();
+    if (!crossingSound.isPlaying()) crossingSound.play();
   }
 }
 
@@ -100,13 +131,18 @@ function startGame() {
   gameState = 'PLAYING';
   lightState = 'GREEN';
   lightTimer = 0;
-  lightDuration = randomRange(CONFIG.GREEN_MIN_MS, CONFIG.GREEN_MAX_MS) / 1000;
+  let targetDuration = randomRange(CONFIG.GREEN_MIN_MS, CONFIG.GREEN_MAX_MS) / 1000;
+  lightDuration = Math.max(1, Math.round(targetDuration / CONFIG.AUDIO_CROSSING_DURATION)) * CONFIG.AUDIO_CROSSING_DURATION;
+
+  if (waitingSound.isPlaying()) waitingSound.stop();
+  crossingSound.play();
   winner = null;
   endReason = '';
+  currentTotalPixels = CONFIG.OBSTACLE_STARTING_PIXELS;
 
   let clockwiseNode = 1;
   let counterclockwiseNode = CONFIG.TRACK_LEN - 1;
-  
+
   let randomize = Math.random() < 0.5;
   let player1Node = randomize ? clockwiseNode : counterclockwiseNode;
   let player2Node = randomize ? counterclockwiseNode : clockwiseNode;
@@ -123,11 +159,14 @@ function endGame(winnerName, reason) {
   gameState = 'END';
   winner = winnerName;
   endReason = reason;
+
+  crossingSound.stop();
+  waitingSound.stop();
 }
 
 function checkWinConditions() {
   let bothDead = !players[0].isAlive && !players[1].isAlive;
-  
+
   if (bothDead && winner === null) {
     endGame('draw', 'both players eliminated');
     return;
@@ -173,9 +212,34 @@ function draw() {
   } else if (gameState === 'PLAYING') {
     let dt = deltaTime / 1000;
     updateLightState(dt);
-    
+
+    for (let i = obstacles.length - 1; i >= 0; i--) {
+      let obs = obstacles[i];
+      for (let j = obs.nodes.length - 1; j >= 0; j--) {
+        let nodeObj = obs.nodes[j];
+        if (nodeObj.isBreathing) {
+          nodeObj.breathingTimer += dt;
+          if (nodeObj.breathingTimer >= CONFIG.BLOCK_BREATHING_DURATION) {
+            obs.nodes.splice(j, 1);
+          }
+        }
+      }
+      if (obs.nodes.length === 0) {
+        obstacles.splice(i, 1);
+      }
+    }
+
     for (let player of players) {
       player.update(dt, lightState, obstacles);
+    }
+
+    // Audio Sync Check
+    if (gameState === 'PLAYING') {
+      if (lightState === 'GREEN' && !crossingSound.isPlaying()) {
+        crossingSound.play();
+      } else if ((lightState === 'BREATHING_GREEN' || lightState === 'RED') && !waitingSound.isPlaying()) {
+        waitingSound.play();
+      }
     }
 
     checkWinConditions();

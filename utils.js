@@ -37,11 +37,12 @@ function getPixelPosition(nodeIndex) {
 /**
  * Draws a square pixel at the given node index
  */
-function drawSquarePixel(nodeIndex, fillColor) {
+function drawSquarePixel(nodeIndex, fillColor, scaleFactor = 1.0) {
   let pos = getPixelPosition(nodeIndex);
   push();
   translate(pos.x, pos.y);
   rotate(pos.angle + HALF_PI);
+  scale(scaleFactor);
   noStroke();
   fill(fillColor);
   rectMode(CENTER);
